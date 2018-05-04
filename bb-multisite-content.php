@@ -2,7 +2,7 @@
 /*
 Plugin Name: BB Multisite Content
 Description: Easily push content from one site to others in your multisite network
-Version: 0.2
+Version: 1.1
 Author: Brown Box
 Author URI: http://brownbox.net.au
 License: GPLv2
