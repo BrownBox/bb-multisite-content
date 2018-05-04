@@ -32,8 +32,23 @@ function bb_multisite_content_meta() {
                     'type' => 'checkbox',
             );
         }
-        new bb_multisite_content\metaClass('Content Sharing', get_post_types(), $fields);
+        new bb_multisite_content\metaClass('Content Sharing', bb_multisite_get_post_types(), $fields);
     }
+}
+
+function bb_multisite_get_post_types() {
+    $skip_types = array(
+            'transaction',
+            'acf',
+            'revision',
+    );
+    $post_types = get_post_types();
+    foreach ($post_types as $idx => $post_type) {
+        if (in_array($post_type, $skip_types)) {
+            unset($post_types[$idx]);
+        }
+    }
+    return $post_types;
 }
 
 add_action('save_post', 'bb_multisite_save_post', 99, 3);
@@ -46,8 +61,8 @@ function bb_multisite_transition_post_status($new_status, $old_status, $post) {
     bb_multisite_push_content($post);
 }
 
-function bb_multisite_push_content($post) {
-    if ($post->post_type == 'revision') {
+function bb_multisite_push_content(WP_Post $post) {
+    if (!in_array($post->post_type, bb_multisite_get_post_types())) {
         return;
     }
     $post_id = $post->ID;
