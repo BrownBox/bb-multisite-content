@@ -104,11 +104,19 @@ function bb_multisite_push_content(WP_Post $post) {
     // Remove some actions that will cause us headaches
     remove_action('save_post', 'bb_multisite_save_post', 99);
     remove_action('transition_post_status', 'bb_multisite_transition_post_status', 99);
+    remove_action('added_post_meta', 'bb_multisite_push_meta', 10, 4);
+    remove_action('updated_post_meta', 'bb_multisite_push_meta', 10);
 
     foreach ($blogs as $tmp_blog) {
         if ($_POST['push_to_blog_'.$tmp_blog->blog_id] == 'true') {
             unset($_POST['push_to_blog_'.$tmp_blog->blog_id]);
 
+            if ($post->post_parent > 0) {
+                $target_parent_id = get_post_meta($post->post_parent, 'post_id_blog_'.$tmp_blog->blog_id, true);
+                if ($target_parent_id) {
+                    $post->post_parent = $target_parent_id;
+                }
+            }
             $maybe_target_id = $post_meta['post_id_blog_'.$tmp_blog->blog_id][0];
             if (!empty($maybe_target_id)) { // Already pushed
                 switch_to_blog($tmp_blog->blog_id);
@@ -178,7 +186,35 @@ function bb_multisite_push_content(WP_Post $post) {
     // Reinstate actions
     add_action('save_post', 'bb_multisite_save_post', 99, 3);
     add_action('transition_post_status', 'bb_multisite_transition_post_status', 99, 3);
+    add_action('added_post_meta', 'bb_multisite_push_meta', 10, 4);
+    add_action('updated_post_meta', 'bb_multisite_push_meta', 10, 4);
 }
+
+add_action('added_post_meta', 'bb_multisite_push_meta', 10, 4);
+add_action('updated_post_meta', 'bb_multisite_push_meta', 10, 4);
+function bb_multisite_push_meta($meta_id, $object_id, $meta_key, $meta_value) {
+    if (strpos($meta_key, 'post_id_blog_') === false) {
+        $post_meta = get_post_meta($object_id);
+        foreach ($post_meta as $mk => $mv) {
+            if (strpos($mk, 'post_id_blog_') !== false) {
+                $tmp_blog_id = str_replace('post_id_blog_', '', $mk);
+                $target_post_id = $mv[0];
+                if (bb_multisite_can_update_post($object_id, $tmp_blog_id, $target_post_id)) {
+                    switch_to_blog($tmp_blog_id);
+                    remove_action('updated_post_meta', 'bb_multisite_push_meta', 10);
+                    update_post_meta($target_post_id, $meta_key, $meta_value);
+                    add_action('updated_post_meta', 'bb_multisite_push_meta', 10, 4);
+                    restore_current_blog();
+                }
+            }
+        }
+    }
+}
+
+// add_action('set_object_terms', 'bb_multisite_set_object_terms', 10, 6);
+// function bb_multisite_set_object_terms($object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids) {
+
+// }
 
 add_action('edit_term', 'bb_multisite_push_term', 10, 3);
 function bb_multisite_push_term($term_id, $tt_id, $taxonomy) {
